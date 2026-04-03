@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+    <meta name="description"
+        content="Advanced Earthquake Early Warning System – Real-time P-wave alerts, S-wave predictions, and 7-day earthquake history based on your live location. Uses USGS data and seismic travel time modeling.">
+    <meta name="theme-color" content="#0b0b1f">
+    <title>Seismic Sentinel | Real-time Earthquake Early Warning</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, 'Roboto', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #1a1a2f, #0f0f1e);
+            color: #f0f3fa;
+            padding: 1.2rem;
+            transition: background 0.2s ease;
+        }
+
+        .flash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            pointer-events: none;
+            z-index: 9999;
+            animation: flashWhite 0.4s ease-out;
+        }
+
+        @keyframes flashWhite {
+            0% {
+                opacity: 1;
+                background: rgba(255, 255, 255, 0.95);
+            }
+
+            100% {
+                opacity: 0;
+                background: rgba(255, 255, 255, 0);
+            }
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            backdrop-filter: blur(2px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 1.8rem;
+        }
+
+        .header h1 {
+            font-size: 2.1rem;
+            background: linear-gradient(135deg, #e0e7ff, #a5b4fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            background: #2d2a5e;
+            padding: 0.25rem 1rem;
+            border-radius: 60px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #b9c7ff;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .dashboard {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(11, 11, 31, 0.65);
+            backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            padding: 1.2rem 1.5rem;
+            border: 1px solid rgba(90, 100, 180, 0.25);
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            border-color: rgba(130, 140, 220, 0.5);
+        }
+
+        .location-card {
+            flex: 1.2;
+            min-width: 240px;
+        }
+
+        .alert-card {
+            flex: 2;
+            min-width: 280px;
+            background: rgba(20, 15, 45, 0.8);
+        }
+
+        .status-card {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            color: #b9c4ff;
+            margin-bottom: 0.8rem;
+            border-left: 3px solid #ff6b6b;
+            padding-left: 12px;
+        }
+
+        .loc-value {
+            font-size: 1rem;
+            font-weight: 500;
+            margin: 8px 0;
+            word-break: break-word;
+        }
+
+        .live-alert {
+            background: #0f0e1c;
+            border-radius: 1.5rem;
+            padding: 0.9rem;
+            margin-top: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .danger-text {
+            color: #ff5e6b;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .btn-location {
+            background: #2d2b55;
+            border: none;
+            color: white;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-location:hover {
+            background: #4a4580;
+            transform: scale(0.97);
+        }
+
+        .history-section {
+            background: rgba(11, 11, 31, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 2rem;
+            padding: 1.3rem;
+            border: 1px solid rgba(80, 90, 160, 0.3);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .quake-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .quake-item {
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 1.2rem;
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            transition: 0.1s;
+            border-left: 4px solid #ff8c5a;
+        }
+
+        .quake-mag {
+            font-weight: 800;
+            font-size: 1.2rem;
+            background: #2c284b;
+            padding: 2px 12px;
+            border-radius: 30px;
+        }
+
+        .quake-place {
+            font-size: 0.85rem;
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .quake-time {
+            font-size: 0.7rem;
+            color: #a0a5cf;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.7rem;
+            margin-top: 1.6rem;
+            opacity: 0.7;
+        }
+
+        .quake-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .quake-list::-webkit-scrollbar-track {
+            background: #1e1c3a;
+            border-radius: 10px;
+        }
+
+        .quake-list::-webkit-scrollbar-thumb {
+            background: #6c6bb3;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 0.8rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .quake-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .header h1 {
+                font-size: 1.6rem;
+            }
+        }
+
+        .blink-red {
+            animation: pulseRed 0.9s infinite;
+            font-weight: bold;
+        }
+
+        @keyframes pulseRed {
+            0% {
+                text-shadow: 0 0 0px #ff5e6b;
+            }
+
+            100% {
+                text-shadow: 0 0 6px #ff2e4a;
+            }
+        }
+
+        .enable-sound-banner {
+            background: #2c2855;
+            padding: 6px 12px;
+            border-radius: 60px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .permission-prompt {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 1rem;
+            padding: 0.5rem;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌍 SEISMIC SENTINEL ⚡</h1>
+            <div class="badge">P‑wave early warning • S‑wave predictor • 7‑day history</div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card location-card">
+                <div class="card-title">📍 YOUR LIVE POSITION</div>
+                <div id="locationDisplay" class="loc-value">🔍 Requesting location access...</div>
+                <div id="countryDisplay" class="loc-value" style="font-size:0.9rem;">🌐 Country: —</div>
+                <button id="refreshLocationBtn" class="btn-location">📍 Allow / Refresh Location</button>
+                <div id="soundUnlockMsg" class="enable-sound-banner">🔊 Tap to enable ALERT sound & vibration</div>
+                <div id="geoPermissionHint" class="permission-prompt" style="display: none;">⚠️ Location permission
+                    needed. Click "Allow" in browser popup.</div>
+            </div>
+
+            <div class="card alert-card">
+                <div class="card-title">⚠️ REAL-TIME EARLY WARNING</div>
+                <div id="alertLiveMsg" class="live-alert">✅ Waiting for location access...<br>Please allow location to
+                    start seismic monitoring.</div>
+                <div id="pwaveInfo" style="font-size:0.8rem; margin-top: 8px;">📡 P‑wave & S‑wave travel model active
+                </div>
+            </div>
+
+            <div class="card status-card">
+                <div class="card-title">📡 MONITOR STATUS</div>
+                <div id="statusMsg">🟢 Awaiting location...</div>
+                <div id="lastUpdateTime" style="font-size:0.75rem; margin-top: 8px;">—</div>
+                <div id="nearestThreat" style="font-size:0.8rem; margin-top: 8px;">🌀 Enable location to detect threats
+                </div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="history-header">
+                <div class="card-title" style="border-left-color: #5f9eff;">📜 EARTHQUAKE HISTORY (Last 7 days · Your
+                    Country)</div>
+                <button id="refreshHistoryBtn" class="btn-location" style="padding: 4px 16px;">🔄 Refresh</button>
+            </div>
+            <div id="historyListContainer" class="quake-list">
+                <div style="text-align:center; padding: 20px;">📍 Allow location to see local earthquake history</div>
+            </div>
+        </div>
+        <div class="footer-note">
+            ⚡ Early warning based on real USGS events + travel-time (P-wave ~6 km/s, S-wave ~3.5 km/s). Alerts trigger
+            when P-wave arrives & S-wave is imminent. Vibration + flash + screen alert.
+        </div>
+    </div>
+
+    <script>
+        // ----------------------------------- GLOBALS ---------------------------------
+        let userLat = null, userLon = null, userCountry = null;
+        let monitoringInterval = null;
+        let alertedEventIds = new Set();
+        let audioAllowed = false;
+        let audioCtx = null;
+
+        // DOM elements
+        const locationDisplay = document.getElementById('locationDisplay');
+        const countryDisplaySpan = document.getElementById('countryDisplay');
+        const alertLiveMsg = document.getElementById('alertLiveMsg');
+        const statusMsgSpan = document.getElementById('statusMsg');
+        const lastUpdateSpan = document.getElementById('lastUpdateTime');
+        const nearestThreatSpan = document.getElementById('nearestThreat');
+        const historyContainer = document.getElementById('historyListContainer');
+        const refreshLocationBtn = document.getElementById('refreshLocationBtn');
+        const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
+        const soundUnlockDiv = document.getElementById('soundUnlockMsg');
+        const geoPermissionHint = document.getElementById('geoPermissionHint');
+
+        // ------------------------------ HELPER FUNCTIONS ----------------------------
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function triggerFlash() {
+            const flashDiv = document.createElement('div');
+            flashDiv.className = 'flash-overlay';
+            document.body.appendChild(flashDiv);
+            setTimeout(() => { flashDiv.remove(); }, 400);
+        }
+
+        function triggerVibrateAndBeep() {
+            if (navigator.vibrate && audioAllowed) {
+                try { navigator.vibrate([300, 150, 300]); } catch (e) { }
+            } else if (navigator.vibrate) {
+                try { navigator.vibrate([200, 100, 200]); } catch (e) { }
+            }
+            if (audioAllowed && audioCtx) {
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.value = 880;
+                    gain.gain.value = 0.3;
+                    osc.start();
+                    gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 1);
+                    osc.stop(audioCtx.currentTime + 0.8);
+                } catch (e) { }
+            }
+        }
+
+        function showAlertMessage(message) {
+            alertLiveMsg.innerHTML = `<span style="display:flex; gap:8px; align-items:center;">⚠️ <strong style="color:#ff6b6b;">${message}</strong> 🚨</span><div style="font-size:0.75rem; margin-top:6px;">S-wave imminent! Take cover immediately.</div>`;
+            alertLiveMsg.classList.add('blink-red');
+            setTimeout(() => {
+                if (alertLiveMsg) alertLiveMsg.classList.remove('blink-red');
+                if (!alertLiveMsg.innerHTML.includes("EARTHQUAKE ALERT")) {
+                    alertLiveMsg.innerHTML = "✅ Monitoring active. Ready for P-wave alerts.";
+                }
+            }, 8000);
+            triggerFlash();
+            triggerVibrateAndBeep();
+        }
+
+        function evaluateEarthquakeForAlert(quake, userLat, userLon, nowEpochMs) {
+            const eqLat = quake.geometry.coordinates[1];
+            const eqLon = quake.geometry.coordinates[0];
+            const mag = quake.properties.mag;
+            if (mag < 3.0) return null;
+            const distKm = haversineDistance(userLat, userLon, eqLat, eqLon);
+            if (distKm > 1200) return null;
+            const originTime = new Date(quake.properties.time).getTime();
+            const pWaveTravelSec = distKm / 6.0;
+            const sWaveTravelSec = distKm / 3.5;
+            const pArrivalMs = originTime + (pWaveTravelSec * 1000);
+            const sArrivalMs = originTime + (sWaveTravelSec * 1000);
+            const nowMs = nowEpochMs;
+            if (nowMs >= pArrivalMs && nowMs < sArrivalMs) {
+                const secondsToS = Math.max(0, ((sArrivalMs - nowMs) / 1000).toFixed(1));
+                if (secondsToS <= 45) {
+                    return { alert: true, secondsToS: secondsToS, mag: mag, place: quake.properties.place, distKm: distKm.toFixed(1) };
+                }
+            }
+            return null;
+        }
+
+        async function fetchLiveEarthquakesAndAlert() {
+            if (userLat === null || userLon === null) return;
+            try {
+                statusMsgSpan.innerHTML = "🔄 Fetching real-time seismic data...";
+                const url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson";
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("USGS fetch error");
+                const data = await response.json();
+                const features = data.features;
+                const nowTime = Date.now();
+                let nearestDist = Infinity;
+                let nearestMag = 0;
+                let alertTriggered = false;
+
+                for (const eq of features) {
+                    const mag = eq.properties.mag;
+                    if (mag < 2.8) continue;
+                    const coords = eq.geometry.coordinates;
+                    const eqLat = coords[1];
+                    const eqLon = coords[0];
+                    const dist = haversineDistance(userLat, userLon, eqLat, eqLon);
+                    if (dist < nearestDist) { nearestDist = dist; nearestMag = mag; }
+                    const alertInfo = evaluateEarthquakeForAlert(eq, userLat, userLon, nowTime);
+                    if (alertInfo && alertInfo.alert && !alertedEventIds.has(eq.id)) {
+                        alertedEventIds.add(eq.id);
+                        const msg = `⚠️ EARTHQUAKE ALERT! M${alertInfo.mag.toFixed(1)} • ${alertInfo.place.substring(0, 55)} • S‑wave in ${alertInfo.secondsToS} sec!`;
+                        showAlertMessage(msg);
+                        alertTriggered = true;
+                        alertLiveMsg.innerHTML = `<div class="danger-text">🔔 ${msg}</div><div style="font-size:0.8rem;">P-wave detected — Take cover immediately!</div>`;
+                        setTimeout(() => {
+                            if (alertLiveMsg && !alertLiveMsg.innerHTML.includes("EARTHQUAKE ALERT") && !alertLiveMsg.innerHTML.includes("P-wave detected"))
+                                alertLiveMsg.innerHTML = "✅ Monitoring active. Ready for P-wave alerts.";
+                        }, 14000);
+                    }
+                }
+                if (!alertTriggered && (!alertLiveMsg.innerHTML.includes("EARTHQUAKE ALERT") && !alertLiveMsg.innerHTML.includes("P-wave detected"))) {
+                    alertLiveMsg.innerHTML = "✅ Monitoring active. No immediate P‑wave arrival detected.";
+                }
+                nearestThreatSpan.innerHTML = nearestDist < 500 ? `⚠️ Nearest event: M${nearestMag.toFixed(1)} at ${nearestDist.toFixed(0)} km` : "🌀 No nearby threats in last hour";
+                lastUpdateSpan.innerHTML = `Last live update: ${new Date().toLocaleTimeString()}`;
+                statusMsgSpan.innerHTML = "🟢 Live monitoring active";
+            } catch (err) {
+                console.error("USGS fetch error:", err);
+                statusMsgSpan.innerHTML = "⚠️ USGS fetch error, retrying...";
+            }
+        }
+
+        async function fetchCountryHistory() {
+            if (!userCountry) {
+                historyContainer.innerHTML = '<div style="text-align:center; padding: 20px;">📍 Allow location to load earthquake history for your country.</div>';
+                return;
+            }
+            historyContainer.innerHTML = '<div style="text-align:center; padding: 20px;">⏳ Loading historical quakes for your country...</div>';
+            try {
+                const endDate = new Date();
+                const startDate = new Date();
+                startDate.setDate(endDate.getDate() - 7);
+                const startISO = startDate.toISOString().split('T')[0];
+                const endISO = endDate.toISOString().split('T')[0];
+                const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=${startISO}&endtime=${endISO}&minmagnitude=2.5&orderby=time`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                const events = data.features;
+                const countryLower = userCountry.toLowerCase();
+                const filtered = events.filter(ev => {
+                    const place = ev.properties.place.toLowerCase();
+                    return place.includes(countryLower) ||
+                        (countryLower === "united states" && (place.includes(" usa") || place.includes("united states"))) ||
+                        (countryLower === "uk" && place.includes("united kingdom")) ||
+                        (countryLower === "india" && place.includes("india")) ||
+                        (countryLower === "pakistan" && place.includes("pakistan"));
+                });
+                if (filtered.length === 0) {
+                    historyContainer.innerHTML = `<div style="text-align:center; padding: 20px;">📭 No earthquakes M2.5+ in ${userCountry} (last 7 days).</div>`;
+                    return;
+                }
+                filtered.sort((a, b) => b.properties.time - a.properties.time);
+                historyContainer.innerHTML = "";
+                filtered.forEach(ev => {
+                    const mag = ev.properties.mag.toFixed(1);
+                    const place = ev.properties.place;
+                    const timeStr = new Date(ev.properties.time).toLocaleString();
+                    const div = document.createElement('div');
+                    div.className = "quake-item";
+                    div.innerHTML = `
+          <div class="quake-mag" style="background:#2e2a55;">M ${mag}</div>
+          <div class="quake-place">📍 ${place.substring(0, 70)}</div>
+          <div class="quake-time">🕒 ${timeStr}</div>
+        `;
+                    historyContainer.appendChild(div);
+                });
+            } catch (err) {
+                console.error("History fetch error:", err);
+                historyContainer.innerHTML = '<div style="color:#ff9f6e;">⚠️ Failed to load history. Check network.</div>';
+            }
+        }
+
+        async function reverseGeocode(lat, lon) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=5&addressdetails=1`);
+                const data = await res.json();
+                let country = data.address?.country || "Unknown";
+                if (country === "Unknown") country = "International";
+                return country;
+            } catch (e) {
+                console.warn("Reverse geocode error", e);
+                return "Unknown";
+            }
+        }
+
+        // Core location function with robust error handling
+        async function updateUserLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    locationDisplay.innerHTML = "❌ Geolocation not supported by your browser.";
+                    statusMsgSpan.innerHTML = "⚠️ Geolocation unavailable";
+                    alertLiveMsg.innerHTML = "⚠️ Browser does not support location. Cannot detect earthquakes near you.";
+                    reject(new Error("Geolocation not supported"));
+                    return;
+                }
+
+                geoPermissionHint.style.display = "block";
+                setTimeout(() => { geoPermissionHint.style.display = "none"; }, 6000);
+
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        // SUCCESS
+                        userLat = position.coords.latitude;
+                        userLon = position.coords.longitude;
+                        locationDisplay.innerHTML = `📍 ${userLat.toFixed(5)}, ${userLon.toFixed(5)}<br>Accuracy: ${Math.round(position.coords.accuracy)}m`;
+
+                        try {
+                            userCountry = await reverseGeocode(userLat, userLon);
+                            countryDisplaySpan.innerHTML = `🌐 Country: ${userCountry}`;
+                        } catch (e) {
+                            userCountry = "Unknown";
+                            countryDisplaySpan.innerHTML = `🌐 Country: ${userCountry} (geo service error)`;
+                        }
+
+                        // Start monitoring & history fetch
+                        fetchCountryHistory();
+                        fetchLiveEarthquakesAndAlert();
+                        monitoringInterval = setInterval(fetchLiveEarthquakesAndAlert, 13000);
+                    },
+                    async (err) => {
+                        console.warn("Geolocation error:", err);
+
+                        // If GPS fails, fallback to IP
+                        await fallbackIPLocation();
+                        fetchCountryHistory();
+                        fetchLiveEarthquakesAndAlert();
+                        monitoringInterval = setInterval(fetchLiveEarthquakesAndAlert, 13000);
+
+                        // Show error message
+                        locationDisplay.innerHTML += "<br>⚠️ GPS failed, using approximate IP location.";
+                    },
+                    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 } // <-- increased timeout
+                );
+            });
+        }
+
+        async function manualHistoryRefresh() {
+            if (userCountry) {
+                await fetchCountryHistory();
+            } else if (userLat && userLon) {
+                // If we have coordinates but no country, try to get country again
+                try {
+                    const country = await reverseGeocode(userLat, userLon);
+                    userCountry = country;
+                    countryDisplaySpan.innerHTML = `🌐 Country: ${userCountry}`;
+                    await fetchCountryHistory();
+                } catch (e) {
+                    alert("Could not determine country. Please ensure internet connection.");
+                }
+            } else {
+                alert("Location not available. Please allow location access first.");
+                updateUserLocation();
+            }
+        }
+
+        function initAudioAndVibrationOnUserGesture() {
+            if (audioAllowed) return;
+            if (audioCtx === null) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    audioAllowed = true;
+                    soundUnlockDiv.innerHTML = "✅ Sound & Vibration ACTIVE!";
+                    soundUnlockDiv.style.background = "#2b5e3b";
+                    if (navigator.vibrate) navigator.vibrate(100);
+                    try {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.frequency.value = 650;
+                        gain.gain.value = 0.15;
+                        osc.start();
+                        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.6);
+                        osc.stop(audioCtx.currentTime + 0.5);
+                    } catch (e) { }
+                }).catch(e => console.warn);
+            } else {
+                audioAllowed = true;
+                soundUnlockDiv.innerHTML = "✅ Sound ready!";
+            }
+        }
+
+        // If Location not access fallback into user IP
+
+        async function fallbackIPLocation() {
+            try {
+                const res = await fetch("https://ipapi.co/json/");
+                const data = await res.json();
+                userLat = data.latitude;
+                userLon = data.longitude;
+                userCountry = data.country_name;
+                locationDisplay.innerHTML = `📍 ${userLat.toFixed(5)}, ${userLon.toFixed(5)} (approx via IP)`;
+                countryDisplaySpan.innerHTML = `🌐 Country: ${userCountry} (IP-based)`;
+            } catch (e) {
+                console.error("IP fallback failed", e);
+                locationDisplay.innerHTML = "❌ Could not determine location via GPS or IP.";
+            }
+        }
+
+        // Event listeners
+        refreshLocationBtn.addEventListener('click', async () => {
+            if (monitoringInterval) clearInterval(monitoringInterval);
+            await updateUserLocation();
+        });
+
+        refreshHistoryBtn.addEventListener('click', manualHistoryRefresh);
+        soundUnlockDiv.addEventListener('click', () => initAudioAndVibrationOnUserGesture());
+        document.body.addEventListener('click', () => {
+            if (!audioAllowed) initAudioAndVibrationOnUserGesture();
+        }, { once: false });
+
+        // Start app - immediately request location (browser will show permission popup if needed)
+        (async () => {
+            await updateUserLocation().catch((err) => {
+                console.warn("Initial location request:", err.message);
+                statusMsgSpan.innerHTML = "⚠️ Click 'Allow / Refresh Location' to start monitoring";
+                locationDisplay.innerHTML = "📍 Click button above and allow location access";
+            });
+        })();
+    </script>
+</body>
+
+</html>
